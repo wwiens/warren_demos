@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+pydantic
+python-dotenv
+pyautogen==0.2.*
+httpx<0.28.0
+requests
