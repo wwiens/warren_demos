@@ -1,0 +1,60 @@
+# Secrets
+.env
+.env.*
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+wheels/
+*.whl
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Package managers
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# IDEs
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Logs
+*.log
+logs/
