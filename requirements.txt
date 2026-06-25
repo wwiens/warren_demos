@@ -1,0 +1,10 @@
+# MAI-II_Demo_01_agent.py
+autogen-core==0.7.5
+autogen-ext[openai]==0.7.5
+
+# MAI-II_Demo_02_autogen_compliance.py, MAI-II_code.py
+ag2[openai]==0.13.4
+
+# Shared
+python-dotenv==1.2.2
+openai==2.44.0
