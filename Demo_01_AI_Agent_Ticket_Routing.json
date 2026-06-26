@@ -1,0 +1,302 @@
+{
+  "name": "Demo 01 - AI Agent Ticket Routing (Form + Branching)",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Support Ticket Intake",
+        "formDescription": "Submit a support request and our AI will triage it for priority.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Name",
+              "placeholder": "Jane Doe",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Email",
+              "fieldType": "email",
+              "placeholder": "jane@example.com",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Subject",
+              "placeholder": "Brief summary of the issue",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Message",
+              "fieldType": "textarea",
+              "placeholder": "Describe the issue in detail...",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {
+          "buttonLabel": "Submit Ticket"
+        }
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        -880,
+        0
+      ],
+      "id": "f1a1a1a1-0001-4a11-9a11-000000000001",
+      "name": "Support Ticket Form",
+      "webhookId": "f1a1a1a1-0001-4a11-9a11-000000000001"
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $json || {};\n\n// Normalize the form field names into clean keys for downstream nodes\nconst name = r['Name'] || \"\";\nconst email = r['Email'] || \"\";\nconst subject = r['Subject'] || \"\";\nconst message = r['Message'] || \"\";\n\nreturn [{\n  json: {\n    timestamp: new Date().toISOString(),\n    name,\n    email,\n    subject,\n    message\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -640,
+        0
+      ],
+      "id": "f1a1a1a1-0002-4a11-9a11-000000000002",
+      "name": "Normalize Form Data"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a customer support ticket triage assistant.\n\nClassify the priority of the following support ticket as exactly one of: High, Medium, or Low.\n\n- High: urgent, critical, system down, blocking, time-sensitive business impact\n- Medium: a real problem or error affecting the user but not blocking/urgent\n- Low: general questions, minor issues, feature requests, no real urgency\n\nSubject: {{$json.subject}}\nMessage: {{$json.message}}\n\nRespond with ONLY valid JSON in this exact shape, no extra text, no markdown formatting:\n{\"priority\": \"High\" | \"Medium\" | \"Low\", \"reasoning\": \"one short sentence explaining why\"}",
+        "options": {
+          "systemMessage": "=You are a precise JSON-only classification engine. Always return strictly valid JSON matching the requested schema and nothing else."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.9,
+      "position": [
+        -400,
+        0
+      ],
+      "id": "f1a1a1a1-0003-4a11-9a11-000000000003",
+      "name": "AI Agent - Classify Priority"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -400,
+        220
+      ],
+      "id": "f1a1a1a1-0004-4a11-9a11-000000000004",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const ticket = $('Normalize Form Data').first().json;\nconst agentOut = $json.output || $json.text || $json || {};\n\nlet parsed;\ntry {\n  // Handle plain JSON or JSON wrapped in markdown code fences\n  const raw = typeof agentOut === 'string' ? agentOut : JSON.stringify(agentOut);\n  const cleaned = raw.replace(/```json|```/g, '').trim();\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  parsed = { priority: \"Low\", reasoning: \"Could not parse AI output, defaulted to Low.\" };\n}\n\nconst priority = ['High', 'Medium', 'Low'].includes(parsed.priority) ? parsed.priority : \"Low\";\n\nreturn [{\n  json: {\n    ...ticket,\n    priority,\n    reasoning: parsed.reasoning || \"\"\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        0
+      ],
+      "id": "f1a1a1a1-0005-4a11-9a11-000000000005",
+      "name": "Parse AI Output"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1a1a1a1-0001-4a11-9a11-000000000010",
+              "leftValue": "={{$json.priority}}",
+              "rightValue": "High",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        80,
+        0
+      ],
+      "id": "f1a1a1a1-0006-4a11-9a11-000000000006",
+      "name": "Is High Priority?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1a1a1a1-0001-4a11-9a11-000000000020",
+              "name": "routePath",
+              "value": "ESCALATION",
+              "type": "string"
+            },
+            {
+              "id": "a1a1a1a1-0002-4a11-9a11-000000000021",
+              "name": "alertMessage",
+              "value": "=🚨 HIGH PRIORITY TICKET — immediate attention required.\\nFrom: {{$json.name}} ({{$json.email}})\\nSubject: {{$json.subject}}\\nReason: {{$json.reasoning}}",
+              "type": "string"
+            },
+            {
+              "id": "a1a1a1a1-0003-4a11-9a11-000000000022",
+              "name": "status",
+              "value": "Escalated",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        340,
+        -120
+      ],
+      "id": "f1a1a1a1-0007-4a11-9a11-000000000007",
+      "name": "Escalation Path (High)"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1a1a1a1-0004-4a11-9a11-000000000023",
+              "name": "routePath",
+              "value": "STANDARD_QUEUE",
+              "type": "string"
+            },
+            {
+              "id": "a1a1a1a1-0005-4a11-9a11-000000000024",
+              "name": "queueMessage",
+              "value": "=Ticket queued normally.\\nFrom: {{$json.name}} ({{$json.email}})\\nSubject: {{$json.subject}}\\nPriority: {{$json.priority}}\\nReason: {{$json.reasoning}}",
+              "type": "string"
+            },
+            {
+              "id": "a1a1a1a1-0006-4a11-9a11-000000000025",
+              "name": "status",
+              "value": "Logged",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        340,
+        120
+      ],
+      "id": "f1a1a1a1-0008-4a11-9a11-000000000008",
+      "name": "Standard Path (Medium-Low)"
+    }
+  ],
+  "connections": {
+    "Support Ticket Form": {
+      "main": [
+        [
+          {
+            "node": "Normalize Form Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Form Data": {
+      "main": [
+        [
+          {
+            "node": "AI Agent - Classify Priority",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent - Classify Priority": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent - Classify Priority",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Output": {
+      "main": [
+        [
+          {
+            "node": "Is High Priority?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is High Priority?": {
+      "main": [
+        [
+          {
+            "node": "Escalation Path (High)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Standard Path (Medium-Low)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}
