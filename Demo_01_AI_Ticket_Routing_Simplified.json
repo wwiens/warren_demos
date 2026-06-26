@@ -1,5 +1,5 @@
 {
-  "name": "Demo 01 - AI Agent Ticket Routing (Form + Branching)",
+  "name": "Demo 01 - AI Ticket Routing (Form + Branching, Simplified)",
   "nodes": [
     {
       "parameters": {
@@ -60,38 +60,39 @@
     },
     {
       "parameters": {
-        "promptType": "define",
-        "text": "=You are a customer support ticket triage assistant.\n\nClassify the priority of the following support ticket as exactly one of: High, Medium, or Low.\n\n- High: urgent, critical, system down, blocking, time-sensitive business impact\n- Medium: a real problem or error affecting the user but not blocking/urgent\n- Low: general questions, minor issues, feature requests, no real urgency\n\nSubject: {{$json.subject}}\nMessage: {{$json.message}}\n\nRespond with ONLY valid JSON in this exact shape, no extra text, no markdown formatting:\n{\"priority\": \"High\" | \"Medium\" | \"Low\", \"reasoning\": \"one short sentence explaining why\"}",
+        "resource": "chat",
+        "operation": "complete",
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a precise JSON-only classification engine for customer support tickets. Always return strictly valid JSON matching the requested schema and nothing else - no markdown, no commentary."
+            },
+            {
+              "role": "user",
+              "content": "=Classify the priority of the following support ticket as exactly one of: High, Medium, or Low.\n\n- High: urgent, critical, system down, blocking, time-sensitive business impact\n- Medium: a real problem or error affecting the user but not blocking/urgent\n- Low: general questions, minor issues, feature requests, no real urgency\n\nSubject: {{$json.subject}}\nMessage: {{$json.message}}\n\nRespond with ONLY valid JSON in this exact shape:\n{\"priority\": \"High\" | \"Medium\" | \"Low\", \"reasoning\": \"one short sentence explaining why\"}"
+            }
+          ]
+        },
+        "jsonOutput": true,
         "options": {
-          "systemMessage": "=You are a precise JSON-only classification engine. Always return strictly valid JSON matching the requested schema and nothing else."
+          "maxTokens": 150,
+          "temperature": 0
         }
       },
-      "type": "@n8n/n8n-nodes-langchain.agent",
-      "typeVersion": 1.9,
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
       "position": [
         -400,
         0
       ],
       "id": "f1a1a1a1-0003-4a11-9a11-000000000003",
-      "name": "AI Agent - Classify Priority"
-    },
-    {
-      "parameters": {
-        "model": {
-          "__rl": true,
-          "mode": "list",
-          "value": "gpt-4o-mini"
-        },
-        "options": {}
-      },
-      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
-      "typeVersion": 1.2,
-      "position": [
-        -400,
-        220
-      ],
-      "id": "f1a1a1a1-0004-4a11-9a11-000000000004",
-      "name": "OpenAI Chat Model",
+      "name": "Classify Priority (OpenAI)",
       "credentials": {
         "openAiApi": {
           "id": "",
@@ -101,7 +102,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const ticket = $('Normalize Form Data').first().json;\nconst agentOut = $json.output || $json.text || $json || {};\n\nlet parsed;\ntry {\n  // Handle plain JSON or JSON wrapped in markdown code fences\n  const raw = typeof agentOut === 'string' ? agentOut : JSON.stringify(agentOut);\n  const cleaned = raw.replace(/```json|```/g, '').trim();\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  parsed = { priority: \"Low\", reasoning: \"Could not parse AI output, defaulted to Low.\" };\n}\n\nconst priority = ['High', 'Medium', 'Low'].includes(parsed.priority) ? parsed.priority : \"Low\";\n\nreturn [{\n  json: {\n    ...ticket,\n    priority,\n    reasoning: parsed.reasoning || \"\"\n  }\n}];"
+        "jsCode": "const ticket = $('Normalize Form Data').first().json;\n\n// The OpenAI node (jsonOutput: true) returns parsed JSON directly in $json,\n// but fall back to message.content in case of raw chat-completion shape.\nlet modelOut = $json;\nif ($json.message && $json.message.content) {\n  modelOut = $json.message.content;\n} else if ($json.choices && $json.choices[0]?.message?.content) {\n  modelOut = $json.choices[0].message.content;\n}\n\nlet parsed;\ntry {\n  const raw = typeof modelOut === 'string' ? modelOut : JSON.stringify(modelOut);\n  const cleaned = raw.replace(/```json|```/g, '').trim();\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  parsed = { priority: \"Low\", reasoning: \"Could not parse AI output, defaulted to Low.\" };\n}\n\nconst priority = ['High', 'Medium', 'Low'].includes(parsed.priority) ? parsed.priority : \"Low\";\n\nreturn [{\n  json: {\n    ...ticket,\n    priority,\n    reasoning: parsed.reasoning || \"\"\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -232,30 +233,19 @@
       "main": [
         [
           {
-            "node": "AI Agent - Classify Priority",
+            "node": "Classify Priority (OpenAI)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "AI Agent - Classify Priority": {
+    "Classify Priority (OpenAI)": {
       "main": [
         [
           {
             "node": "Parse AI Output",
             "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "OpenAI Chat Model": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "AI Agent - Classify Priority",
-            "type": "ai_languageModel",
             "index": 0
           }
         ]
